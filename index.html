@@ -93,7 +93,7 @@
     <pre id="payload-text"></pre>
   </div>
 
-  <div class="payload-box">
+  <div class="payload-box" id="debug-box" hidden>
     <label>Debug log (tamb&eacute;m sai no console)</label>
     <div id="debug-log"></div>
   </div>
@@ -101,9 +101,12 @@
 
 <script>
   const TAG = "[PIX]";
+  const DEBUG = new URLSearchParams(location.search).has("debug");
   const logEl = document.getElementById("debug-log");
+  if (DEBUG) document.getElementById("debug-box").hidden = false;
 
   function log(kind, ...args) {
+    if (!DEBUG) return;
     const line = args.map(a => {
       if (a instanceof Error) return a.name + ": " + a.message;
       if (typeof a === "object") { try { return JSON.stringify(a); } catch { return String(a); } }
