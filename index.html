@@ -52,14 +52,16 @@
   .payload-box label {
     display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px;
   }
-  #payload-input {
+  #payload-text {
+    display: block; margin: 0;
     width: 100%; box-sizing: border-box;
     background: #0b0b0f; color: var(--fg);
     border: 1px solid #2a2a35; border-radius: 8px;
-    padding: 10px; font-size: 11px;
+    padding: 10px; font-size: 11px; line-height: 1.5;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    word-break: break-all; resize: none; min-height: 90px;
+    white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere;
     -webkit-user-select: all; user-select: all;
+    cursor: pointer;
   }
   .hint { color: var(--muted); font-size: 12px; text-align: center; max-width: 320px; line-height: 1.4; }
 </style>
@@ -73,11 +75,11 @@
 
   <button id="copiar">Copiar c&oacute;digo PIX</button>
 
-  <p class="hint">Escaneie o QR no app do seu banco ou copie o c&oacute;digo abaixo e cole em PIX &rarr; Copia e Cola.</p>
+  <p class="hint">Escaneie o QR no app do seu banco ou toque no c&oacute;digo abaixo e depois em "Copiar" no menu do celular.</p>
 
   <div class="payload-box">
-    <label for="payload-input">C&oacute;digo copia-e-cola</label>
-    <textarea id="payload-input" readonly rows="4" onclick="this.select()"></textarea>
+    <label for="payload-text">C&oacute;digo copia-e-cola</label>
+    <pre id="payload-text"></pre>
   </div>
 </main>
 
@@ -86,46 +88,72 @@
 
   QRCode.toCanvas(document.getElementById("qr"), payload, { width: 260, margin: 1 });
 
-  const input = document.getElementById("payload-input");
-  input.value = payload;
+  const payloadEl = document.getElementById("payload-text");
+  payloadEl.textContent = payload;
+
+  payloadEl.addEventListener("click", () => {
+    const range = document.createRange();
+    range.selectNodeContents(payloadEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
 
   const btn = document.getElementById("copiar");
-  const label = "Copiar código PIX";
+  const defaultLabel = "Copiar código PIX";
 
   function flash(text, cls) {
     btn.textContent = text;
     btn.classList.remove("ok", "err");
     if (cls) btn.classList.add(cls);
     setTimeout(() => {
-      btn.textContent = label;
+      btn.textContent = defaultLabel;
       btn.classList.remove("ok", "err");
-    }, 2200);
+    }, 2500);
   }
 
-  function fallbackCopy() {
-    input.focus();
-    input.setSelectionRange(0, payload.length);
-    try {
-      return document.execCommand("copy");
-    } catch (e) {
-      console.warn("execCommand copy failed", e);
-      return false;
-    }
+  function iosFallbackCopy(text) {
+    const helper = document.createElement("textarea");
+    helper.value = text;
+    helper.readOnly = false;
+    helper.contentEditable = "true";
+    helper.style.position = "fixed";
+    helper.style.top = "0";
+    helper.style.left = "0";
+    helper.style.width = "1px";
+    helper.style.height = "1px";
+    helper.style.opacity = "0";
+    helper.style.fontSize = "16px";
+    document.body.appendChild(helper);
+
+    const range = document.createRange();
+    range.selectNodeContents(helper);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    helper.setSelectionRange(0, text.length);
+
+    let ok = false;
+    try { ok = document.execCommand("copy"); }
+    catch (e) { console.warn("execCommand failed", e); }
+    document.body.removeChild(helper);
+    return ok;
   }
 
   btn.addEventListener("click", () => {
-    if (navigator.clipboard && window.isSecureContext) {
+    const useApi = navigator.clipboard && window.isSecureContext;
+    if (useApi) {
       navigator.clipboard.writeText(payload).then(
         () => flash("Copiado!", "ok"),
         (err) => {
           console.warn("clipboard.writeText failed", err);
-          if (fallbackCopy()) flash("Copiado!", "ok");
-          else flash("Selecione o código abaixo", "err");
+          if (iosFallbackCopy(payload)) flash("Copiado!", "ok");
+          else flash("Toque no código e use Copiar", "err");
         }
       );
     } else {
-      if (fallbackCopy()) flash("Copiado!", "ok");
-      else flash("Selecione o código abaixo", "err");
+      if (iosFallbackCopy(payload)) flash("Copiado!", "ok");
+      else flash("Toque no código e use Copiar", "err");
     }
   });
 </script>
