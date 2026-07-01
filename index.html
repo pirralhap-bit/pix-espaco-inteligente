@@ -13,6 +13,7 @@
     --muted: #8a8a99;
     --accent: #32d583;
     --accent-fg: #06210f;
+    --warn: #f0b429;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -38,23 +39,29 @@
     padding: 16px 20px; border: 0; border-radius: 14px;
     background: var(--accent); color: var(--accent-fg);
     font-size: 16px; font-weight: 600; cursor: pointer;
-    transition: transform .08s ease, opacity .2s ease;
+    transition: transform .08s ease, background .2s ease;
+    -webkit-tap-highlight-color: transparent;
   }
   button:active { transform: scale(.98); }
   button.ok { background: #2a2a35; color: var(--fg); }
-  details {
+  button.err { background: var(--warn); color: #2b1d00; }
+  .payload-box {
     width: 100%; max-width: 320px;
-    background: var(--card); border-radius: 12px; padding: 12px 14px;
-    font-size: 13px;
+    background: var(--card); border-radius: 12px; padding: 12px;
   }
-  summary { color: var(--muted); cursor: pointer; user-select: none; }
-  code {
-    display: block; margin-top: 10px; padding: 10px;
-    background: #0b0b0f; border-radius: 8px;
-    color: var(--fg); font-size: 11px; word-break: break-all;
+  .payload-box label {
+    display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px;
+  }
+  #payload-input {
+    width: 100%; box-sizing: border-box;
+    background: #0b0b0f; color: var(--fg);
+    border: 1px solid #2a2a35; border-radius: 8px;
+    padding: 10px; font-size: 11px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all; resize: none; min-height: 90px;
+    -webkit-user-select: all; user-select: all;
   }
-  .hint { color: var(--muted); font-size: 12px; text-align: center; max-width: 320px; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; max-width: 320px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -64,37 +71,62 @@
 
   <div class="qr-wrap"><div id="qr"></div></div>
 
-  <button id="copiar">Copiar código PIX</button>
+  <button id="copiar">Copiar c&oacute;digo PIX</button>
 
-  <p class="hint">Escaneie o QR no app do seu banco ou toque em "Copiar" e cole em PIX → Copia e Cola.</p>
+  <p class="hint">Escaneie o QR no app do seu banco ou copie o c&oacute;digo abaixo e cole em PIX &rarr; Copia e Cola.</p>
 
-  <details>
-    <summary>Ver código completo</summary>
-    <code id="payload"></code>
-  </details>
+  <div class="payload-box">
+    <label for="payload-input">C&oacute;digo copia-e-cola</label>
+    <textarea id="payload-input" readonly rows="4" onclick="this.select()"></textarea>
+  </div>
 </main>
 
 <script>
   const payload = "00020101021126360014br.gov.bcb.pix0114319849200001155204000053039865802BR5918ESPACO INTELIGENTE6009SAO PAULO62070503***63043464";
 
   QRCode.toCanvas(document.getElementById("qr"), payload, { width: 260, margin: 1 });
-  document.getElementById("payload").textContent = payload;
+
+  const input = document.getElementById("payload-input");
+  input.value = payload;
 
   const btn = document.getElementById("copiar");
-  btn.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(payload);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = payload; document.body.appendChild(ta);
-      ta.select(); document.execCommand("copy"); ta.remove();
-    }
-    btn.textContent = "Copiado!";
-    btn.classList.add("ok");
+  const label = "Copiar código PIX";
+
+  function flash(text, cls) {
+    btn.textContent = text;
+    btn.classList.remove("ok", "err");
+    if (cls) btn.classList.add(cls);
     setTimeout(() => {
-      btn.textContent = "Copiar código PIX";
-      btn.classList.remove("ok");
-    }, 1500);
+      btn.textContent = label;
+      btn.classList.remove("ok", "err");
+    }, 2200);
+  }
+
+  function fallbackCopy() {
+    input.focus();
+    input.setSelectionRange(0, payload.length);
+    try {
+      return document.execCommand("copy");
+    } catch (e) {
+      console.warn("execCommand copy failed", e);
+      return false;
+    }
+  }
+
+  btn.addEventListener("click", () => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(payload).then(
+        () => flash("Copiado!", "ok"),
+        (err) => {
+          console.warn("clipboard.writeText failed", err);
+          if (fallbackCopy()) flash("Copiado!", "ok");
+          else flash("Selecione o código abaixo", "err");
+        }
+      );
+    } else {
+      if (fallbackCopy()) flash("Copiado!", "ok");
+      else flash("Selecione o código abaixo", "err");
+    }
   });
 </script>
 </body>
